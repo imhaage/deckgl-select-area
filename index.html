@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deckgl GeoJSON</title>
+
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@3.0.0/dist/maplibre-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+    <link
+      href="https://unpkg.com/maplibre-gl@3.0.0/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+      }
+
+      .map {
+        height: 100vh;
+      }
+
+      .buttons {
+        margin: 10px;
+      }
+
+      .button {
+        padding: 0.5rem;
+        color: #fff;
+        background-color: #00a5cf;
+        border: none;
+        border-radius: 0.25rem;
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+        transition: background-color 0.2s;
+      }
+
+      .button:hover {
+        background-color: #28ccf5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <div id="map-container" class="map"></div>
+      <div>
+        <div class="buttons">
+          <button id="remove-last-point" class="button">
+            <svg
+              width="12px"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+              <g
+                id="SVGRepo_tracerCarrier"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              ></g>
+              <g id="SVGRepo_iconCarrier">
+                <path
+                  d="M8 10L8 14L6 14L-2.62268e-07 8L6 2L8 2L8 6L16 6L16 10L8 10Z"
+                  fill="#fff"
+                ></path>
+              </g>
+            </svg>
+            Remove last point (Backspace key)
+          </button>
+          <button id="reset" class="button">Reset (ESC key)</button>
+          <pre><code id="geojson"></code></pre>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const geojsonDisplay = document.querySelector("#geojson");
+
+      const { DeckGL, ScatterplotLayer, SolidPolygonLayer, LineLayer } = deck;
+      let points = [];
+
+      const map = new DeckGL({
+        container: "map-container",
+        mapStyle:
+          "https://basemaps.cartocdn.com/gl/positron-nolabels-gl-style/style.json",
+        initialViewState: {
+          longitude: -122.45,
+          latitude: 37.8,
+          zoom: 15,
+        },
+        onClick: (info) => {
+          points = [...points, info.coordinate];
+          render();
+        },
+        controller: true,
+        layers: [],
+      });
+
+      document.querySelector("#reset").addEventListener("click", reset);
+
+      document
+        .querySelector("#remove-last-point")
+        .addEventListener("click", () => removeLastPoint);
+
+      document.addEventListener("keydown", function (event) {
+        if (
+          event.key === "Escape" ||
+          event.key === "Esc" ||
+          event.keyCode === 27
+        ) {
+          reset();
+        }
+
+        if (event.key === "Backspace" || event.keyCode === 8) {
+          removeLastPoint();
+        }
+      });
+
+      function render(info) {
+        map.setProps({
+          layers: [
+            new ScatterplotLayer({
+              data: points,
+              getPosition: (d) => d,
+              getRadius: 20,
+              getFillColor: [255, 140, 0],
+            }),
+            new SolidPolygonLayer({
+              data: [points],
+              getPolygon: (d) => d,
+              getFillColor: [50, 140, 150, 50],
+            }),
+          ],
+        });
+
+        if (points.length > 3) {
+          geojsonDisplay.textContent = JSON.stringify(
+            turf.polygons([[[...points, points[0]]]]),
+            null,
+            2
+          );
+        } else {
+          geojsonDisplay.textContent =
+            "3 points required to create the GeoJSON polygon";
+        }
+      }
+
+      function reset() {
+        points = [];
+
+        map.setProps({
+          layers: [],
+        });
+
+        geojsonDisplay.textContent = "";
+      }
+
+      function removeLastPoint() {
+        points = points.slice(0, points.length - 1);
+        render();
+      }
+    </script>
+  </body>
+</html>
